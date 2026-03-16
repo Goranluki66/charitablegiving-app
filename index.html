@@ -1158,15 +1158,23 @@ function showToast(msg) {
 }
 
 // ── INIT ──
+renderProjects();
 window.addEventListener('load', function() {
   try {
     Pi.init({ version: '2.0', sandbox: true });
-    console.log('Pi SDK initialized');
+    console.log('Pi SDK ready');
+    Pi.authenticate(['username', 'payments'], onIncompletePaymentFound)
+      .then(auth => {
+        if (auth && auth.user) {
+          currentUser = auth.user;
+          updateUserUI();
+          showToast('✅ ' + t('Welcome','Willkommen') + ' ' + auth.user.username + '!');
+        }
+      }).catch(e => console.log('auto-auth silent:', e));
   } catch(e) {
-    console.log('Pi SDK error:', e);
+    console.log('Pi SDK:', e);
   }
 });
-renderProjects();
 </script>
 </body>
 </html>
