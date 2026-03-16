@@ -1105,16 +1105,26 @@ function processDonation() {
 
 // ── PI LOGIN ──
 function loginWithPi() {
+  showToast('⏳ ' + t('Connecting to Pi...','Verbinde mit Pi...'));
   try {
-    Pi.authenticate(['username', 'payments'], onIncompletePaymentFound)
-      .then(auth => {
+    const authResult = Pi.authenticate(['username', 'payments'], onIncompletePaymentFound);
+    if (authResult && typeof authResult.then === 'function') {
+      authResult.then(auth => {
         currentUser = auth.user;
         updateUserUI();
         showToast('✅ ' + t('Welcome','Willkommen') + ' ' + auth.user.username + '!');
-      })
-      .catch(() => showToast('❌ ' + t('Login failed','Anmeldung fehlgeschlagen')));
+      }).catch(err => {
+        console.log('Auth error:', err);
+        showToast('❌ ' + t('Login failed','Anmeldung fehlgeschlagen'));
+      });
+    } else if (authResult && authResult.user) {
+      currentUser = authResult.user;
+      updateUserUI();
+      showToast('✅ ' + t('Welcome','Willkommen') + ' ' + authResult.user.username + '!');
+    }
   } catch(e) {
-    showToast('ℹ️ ' + t('Open in Pi Browser','Im Pi Browser öffnen'));
+    console.log('Pi error:', e);
+    showToast('❌ ' + t('Login error','Anmeldung fehlgeschlagen') + ': ' + e.message);
   }
 }
 
@@ -1148,7 +1158,14 @@ function showToast(msg) {
 }
 
 // ── INIT ──
-try { Pi.init({ version: '2.0', sandbox: true }); } catch(e) {}
+window.addEventListener('load', function() {
+  try {
+    Pi.init({ version: '2.0', sandbox: true });
+    console.log('Pi SDK initialized');
+  } catch(e) {
+    console.log('Pi SDK error:', e);
+  }
+});
 renderProjects();
 </script>
 </body>
