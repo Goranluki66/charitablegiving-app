@@ -1095,13 +1095,29 @@ function processDonation() {
       },
       {
         onReadyForServerApproval: function(paymentId) {
-          showToast('⏳ ' + t('Processing...','Wird verarbeitet...'));
+          showToast('⏳ ' + t('Approving...','Genehmige...'));
+          fetch('/api/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId: paymentId })
+          }).then(function(r) { return r.json(); })
+            .then(function(d) { console.log('Approved:', d); })
+            .catch(function(e) { console.error('Approve error:', e); });
         },
         onReadyForServerCompletion: function(paymentId, txid) {
-          showToast('🎉 ' + t('Thank you!','Danke!') + ' ' + amount + ' π ' + t('donated!','gespendet!'));
-          currentProject.raised += amount;
-          currentProject.donors += 1;
-          renderProjects('all');
+          fetch('/api/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId: paymentId, txid: txid })
+          }).then(function(r) { return r.json(); })
+            .then(function(d) {
+              console.log('Completed:', d);
+              showToast('🎉 ' + t('Thank you!','Danke!') + ' ' + amount + ' π ' + t('donated!','gespendet!'));
+              currentProject.raised += amount;
+              currentProject.donors += 1;
+              renderProjects('all');
+            })
+            .catch(function(e) { console.error('Complete error:', e); });
         },
         onCancel: function(paymentId) {
           showToast(t('Payment cancelled','Zahlung abgebrochen'));
