@@ -1081,6 +1081,10 @@ function processDonation() {
   closeModal();
   showToast('⏳ ' + t('Connecting to Pi...','Verbinde mit Pi...'));
 
+  function onIncompletePaymentFound(payment) {
+    console.log('Incomplete payment found:', payment);
+  }
+
   function doPayment() {
     const toProject = (amount * (1 - PLATFORM_FEE)).toFixed(2);
     window.Pi.createPayment(
@@ -1110,19 +1114,19 @@ function processDonation() {
   }
 
   try {
-    window.Pi.authenticate(
-      ['username', 'payments'],
-      function(auth) {
+    window.Pi.authenticate(['username', 'payments'], onIncompletePaymentFound)
+      .then(function(auth) {
         currentUser = auth.user;
         updateUserUI();
+        showToast('✅ ' + t('Connected!','Verbunden!') + ' ' + auth.user.username);
         doPayment();
-      },
-      function(err) {
+      })
+      .catch(function(err) {
+        console.log('Auth error:', err);
         showToast('❌ ' + t('Auth failed','Anmeldung fehlgeschlagen'));
-      }
-    );
+      });
   } catch(e) {
-    showToast('ℹ️ ' + t('Open in Pi Browser to donate','Im Pi Browser öffnen zum Spenden'));
+    showToast('ℹ️ ' + t('Open in Pi Browser','Im Pi Browser öffnen'));
   }
 }
 
@@ -1130,19 +1134,20 @@ function processDonation() {
 function loginWithPi() {
   showToast('⏳ ' + t('Connecting to Pi...','Verbinde mit Pi...'));
   try {
-    window.Pi.authenticate(
-      ['username', 'payments'],
-      function(auth) {
-        currentUser = auth.user;
-        updateUserUI();
-        showToast('✅ ' + t('Welcome','Willkommen') + ' ' + auth.user.username + '!');
-      },
-      function(err) {
-        showToast('❌ ' + t('Login failed','Anmeldung fehlgeschlagen'));
-      }
-    );
+    window.Pi.authenticate(['username', 'payments'], function(payment) {
+      console.log('Incomplete payment:', payment);
+    })
+    .then(function(auth) {
+      currentUser = auth.user;
+      updateUserUI();
+      showToast('✅ ' + t('Welcome','Willkommen') + ' ' + auth.user.username + '!');
+    })
+    .catch(function(err) {
+      console.log('Login error:', err);
+      showToast('❌ ' + t('Login failed','Anmeldung fehlgeschlagen'));
+    });
   } catch(e) {
-    showToast('❌ ' + t('Login error','Fehler') + ': ' + e.message);
+    showToast('❌ ' + e.message);
   }
 }
 
