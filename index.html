@@ -1079,25 +1079,48 @@ function processDonation() {
   const amount = custom > 0 ? custom : selectedAmount;
   if (!amount || amount <= 0) { showToast('❌ ' + t('Please select an amount','Bitte Betrag wählen')); return; }
   closeModal();
-  const toProject = (amount * (1 - PLATFORM_FEE)).toFixed(2);
-  const paymentData = {
-    amount: amount,
-    memo: `CharitableGiving.pi – ${currentProject.title.en}`,
-    metadata: { project: currentProject.id, projectTitle: currentProject.title.en, toProject: toProject }
-  };
-  const callbacks = {
-    onReadyForServerApproval: (paymentId) => showToast('⏳ ' + t('Processing...','Wird verarbeitet...')),
-    onReadyForServerCompletion: (paymentId, txid) => {
-      showToast(`🎉 ${t('Thank you!','Danke!')} ${amount} π ${t('donated!','gespendet!')}`);
-      currentProject.raised += amount;
-      currentProject.donors += 1;
-      renderProjects('all');
-    },
-    onCancel: () => showToast(t('Payment cancelled','Zahlung abgebrochen')),
-    onError: (err) => showToast('❌ ' + t('Error, please try again','Fehler, bitte erneut versuchen'))
-  };
+  showToast('⏳ ' + t('Connecting to Pi...','Verbinde mit Pi...'));
+
+  function doPayment() {
+    const toProject = (amount * (1 - PLATFORM_FEE)).toFixed(2);
+    window.Pi.createPayment(
+      {
+        amount: amount,
+        memo: 'CharitableGiving.pi – ' + currentProject.title.en,
+        metadata: { project: currentProject.id, toProject: toProject }
+      },
+      {
+        onReadyForServerApproval: function(paymentId) {
+          showToast('⏳ ' + t('Processing...','Wird verarbeitet...'));
+        },
+        onReadyForServerCompletion: function(paymentId, txid) {
+          showToast('🎉 ' + t('Thank you!','Danke!') + ' ' + amount + ' π ' + t('donated!','gespendet!'));
+          currentProject.raised += amount;
+          currentProject.donors += 1;
+          renderProjects('all');
+        },
+        onCancel: function(paymentId) {
+          showToast(t('Payment cancelled','Zahlung abgebrochen'));
+        },
+        onError: function(error, payment) {
+          showToast('❌ ' + t('Error, please try again','Fehler, bitte erneut versuchen'));
+        }
+      }
+    );
+  }
+
   try {
-    Pi.createPayment(paymentData, callbacks);
+    window.Pi.authenticate(
+      ['username', 'payments'],
+      function(auth) {
+        currentUser = auth.user;
+        updateUserUI();
+        doPayment();
+      },
+      function(err) {
+        showToast('❌ ' + t('Auth failed','Anmeldung fehlgeschlagen'));
+      }
+    );
   } catch(e) {
     showToast('ℹ️ ' + t('Open in Pi Browser to donate','Im Pi Browser öffnen zum Spenden'));
   }
@@ -1107,24 +1130,19 @@ function processDonation() {
 function loginWithPi() {
   showToast('⏳ ' + t('Connecting to Pi...','Verbinde mit Pi...'));
   try {
-    const authResult = Pi.authenticate(['username', 'payments'], onIncompletePaymentFound);
-    if (authResult && typeof authResult.then === 'function') {
-      authResult.then(auth => {
+    window.Pi.authenticate(
+      ['username', 'payments'],
+      function(auth) {
         currentUser = auth.user;
         updateUserUI();
         showToast('✅ ' + t('Welcome','Willkommen') + ' ' + auth.user.username + '!');
-      }).catch(err => {
-        console.log('Auth error:', err);
+      },
+      function(err) {
         showToast('❌ ' + t('Login failed','Anmeldung fehlgeschlagen'));
-      });
-    } else if (authResult && authResult.user) {
-      currentUser = authResult.user;
-      updateUserUI();
-      showToast('✅ ' + t('Welcome','Willkommen') + ' ' + authResult.user.username + '!');
-    }
+      }
+    );
   } catch(e) {
-    console.log('Pi error:', e);
-    showToast('❌ ' + t('Login error','Anmeldung fehlgeschlagen') + ': ' + e.message);
+    showToast('❌ ' + t('Login error','Fehler') + ': ' + e.message);
   }
 }
 
@@ -1161,18 +1179,10 @@ function showToast(msg) {
 renderProjects();
 window.addEventListener('load', function() {
   try {
-    Pi.init({ version: '2.0', sandbox: true });
-    console.log('Pi SDK ready');
-    Pi.authenticate(['username', 'payments'], onIncompletePaymentFound)
-      .then(auth => {
-        if (auth && auth.user) {
-          currentUser = auth.user;
-          updateUserUI();
-          showToast('✅ ' + t('Welcome','Willkommen') + ' ' + auth.user.username + '!');
-        }
-      }).catch(e => console.log('auto-auth silent:', e));
+    window.Pi.init({ version: '2.0', sandbox: true });
+    console.log('Pi SDK ready ✅');
   } catch(e) {
-    console.log('Pi SDK:', e);
+    console.log('Pi SDK not available:', e);
   }
 });
 </script>
